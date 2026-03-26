@@ -1,6 +1,3 @@
-# SOR_Server
-This is Smar order rooting server implemented by Java, it use ZGC and Disrupter framework which provide low latency campability.
->>>>>>> 63a01bb5b44916cabf0bee6e3a45f00b53bef9f6
 # SOR_Server - Smart Order Routing Server
 
 智能订单路由服务器，面向金融交易系统，核心功能是将客户订单智能分发至最优交易所或流动性池。
@@ -190,7 +187,3 @@ MIT License
 
 **版本**: 1.0.0-SNAPSHOT  
 **构建时间**: 2026-03-26
-=======
-# SOR_Server
-This is Smar order rooting server implemented by Java, it use ZGC and Disrupter framework which provide low latency campability.
->>>>>>> 63a01bb5b44916cabf0bee6e3a45f00b53bef9f6
