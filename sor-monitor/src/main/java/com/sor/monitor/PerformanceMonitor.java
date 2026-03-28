@@ -3,6 +3,8 @@ package com.sor.monitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.ThreadMXBean;
@@ -30,10 +32,24 @@ public class PerformanceMonitor {
     private final LongAdder ordersRejected = new LongAdder();
     
     // 延迟统计（简化版，实际应使用直方图）
-    private volatile long totalLatency = 0;
-    private volatile long latencyCount = 0;
+    private final LongAdder totalLatency = new LongAdder();
+    private final LongAdder latencyCount = new LongAdder();
     private volatile long maxLatency = 0;
-    
+
+    private static final VarHandle MAX_LATENCY_HANDLE;
+
+    static {
+        try {
+            MAX_LATENCY_HANDLE = MethodHandles
+                    .lookup()
+                    .findVarHandle(PerformanceMonitor.class, "maxLatency", long.class);
+        } catch (NoSuchFieldException e) {
+            throw new RuntimeException(e);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     // JVM 指标
     private final MemoryMXBean memoryBean;
     private final ThreadMXBean threadBean;
@@ -85,12 +101,19 @@ public class PerformanceMonitor {
      * 记录延迟（纳秒）
      */
     public void recordLatency(long latencyNs) {
-        synchronized (this) {
-            totalLatency += latencyNs;
-            latencyCount++;
-            if (latencyNs > maxLatency) {
-                maxLatency = latencyNs;
-            }
+        // 无锁累加
+        totalLatency.add(latencyNs);
+        latencyCount.increment();
+
+        // 无锁更新最大值（乐观自旋 CAS）
+        updateMaxLatency(latencyNs);
+    }
+
+    private void updateMaxLatency(long newValue) {
+        while (true) {
+            long current = (long) MAX_LATENCY_HANDLE.get(this);
+            if (newValue <= current) break;
+            if (MAX_LATENCY_HANDLE.compareAndSet(this, current, newValue)) break;
         }
     }
     
@@ -99,8 +122,8 @@ public class PerformanceMonitor {
      */
     public double getAverageLatencyMs() {
         synchronized (this) {
-            if (latencyCount == 0) return 0.0;
-            return (totalLatency / (double) latencyCount) / 1_000_000.0;
+            if (latencyCount.sum() == 0) return 0.0;
+            return (totalLatency.sum() / (double) latencyCount.sum()) / 1_000_000.0;
         }
     }
     

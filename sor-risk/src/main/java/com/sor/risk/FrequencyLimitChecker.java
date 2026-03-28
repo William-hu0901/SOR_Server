@@ -60,36 +60,42 @@ public class FrequencyLimitChecker implements RiskChecker {
         
         // 检查交易者频率
         LongAdder traderCounter = traderCounters.computeIfAbsent(traderId, k -> new LongAdder());
-        long traderCount = traderCounter.sum();
-        traderCounter.increment();
-        if (traderCount >= maxOrdersPerTraderPerSecond) {
-            LOG.warn("Trader frequency limit exceeded: trader={}, count={}", 
-                    traderId, traderCount);
-            return RiskCheckResult.fail(
-                String.format("Trader frequency %d exceeds limit %d/sec", 
-                            traderCount, maxOrdersPerTraderPerSecond));
+        synchronized (traderCounter) {
+            long traderCount = traderCounter.sum();
+            if (traderCount >= maxOrdersPerTraderPerSecond) {
+                LOG.warn("Trader frequency limit exceeded: trader={}, count={}", 
+                        traderId, traderCount);
+                return RiskCheckResult.fail(
+                    String.format("Trader frequency %d exceeds limit %d/sec", 
+                                traderCount, maxOrdersPerTraderPerSecond));
+            }
+            traderCounter.increment();
         }
         
         // 检查交易品种频率
         LongAdder symbolCounter = symbolCounters.computeIfAbsent(order.getSymbol(), k -> new LongAdder());
-        long symbolCount = symbolCounter.sum();
-        symbolCounter.increment();
-        if (symbolCount >= maxOrdersPerSymbolPerSecond) {
-            LOG.warn("Symbol frequency limit exceeded: symbol={}, count={}", 
-                    order.getSymbol(), symbolCount);
-            return RiskCheckResult.fail(
-                String.format("Symbol frequency %d exceeds limit %d/sec", 
-                            symbolCount, maxOrdersPerSymbolPerSecond));
+        synchronized (symbolCounter) {
+            long symbolCount = symbolCounter.sum();
+            if (symbolCount >= maxOrdersPerSymbolPerSecond) {
+                LOG.warn("Symbol frequency limit exceeded: symbol={}, count={}", 
+                        order.getSymbol(), symbolCount);
+                return RiskCheckResult.fail(
+                    String.format("Symbol frequency %d exceeds limit %d/sec", 
+                                symbolCount, maxOrdersPerSymbolPerSecond));
+            }
+            symbolCounter.increment();
         }
         
         // 检查全局频率
-        long globalCount = globalCounter.sum();
-        globalCounter.increment();
-        if (globalCount >= maxGlobalOrdersPerSecond) {
-            LOG.warn("Global frequency limit exceeded: count={}", globalCount);
-            return RiskCheckResult.fail(
-                String.format("Global frequency %d exceeds limit %d/sec", 
-                            globalCount, maxGlobalOrdersPerSecond));
+        synchronized (globalCounter) {
+            long globalCount = globalCounter.sum();
+            if (globalCount >= maxGlobalOrdersPerSecond) {
+                LOG.warn("Global frequency limit exceeded: count={}", globalCount);
+                return RiskCheckResult.fail(
+                    String.format("Global frequency %d exceeds limit %d/sec", 
+                                globalCount, maxGlobalOrdersPerSecond));
+            }
+            globalCounter.increment();
         }
         
         LOG.trace("Frequency check passed: trader={}, symbol={}", traderId, order.getSymbol());
@@ -102,20 +108,29 @@ public class FrequencyLimitChecker implements RiskChecker {
     private void resetIfNeeded() {
         long currentTime = System.currentTimeMillis() / 1000;
         if (currentTime > lastResetTime) {
-            // 清空所有计数器
-            traderCounters.values().forEach(LongAdder::reset);
-            symbolCounters.values().forEach(LongAdder::reset);
-            globalCounter.reset();
-            lastResetTime = currentTime;
-            LOG.debug("Frequency counters reset");
+            // 使用双重检查锁定模式确保只有一个线程执行重置
+            if (lastResetTime < currentTime) {
+                synchronized (this) {
+                    if (lastResetTime < currentTime) {
+                        // 清空所有计数器
+                        traderCounters.values().forEach(LongAdder::reset);
+                        symbolCounters.values().forEach(LongAdder::reset);
+                        globalCounter.reset();
+                        lastResetTime = currentTime;
+                        LOG.debug("Frequency counters reset");
+                    }
+                }
+            }
         }
     }
     
     /**
      * 获取交易者 ID（简化实现）
      */
+
     private String getTraderId(Order order) {
         // 实际应用中应该从订单的账户字段获取
-        return "TRADER_" + Math.abs(order.getOrderId() % 1000);
+        //return "TRADER_" + Math.abs(order.getOrderId() % 1000);
+        return String.valueOf(order.getOrderId());
     }
 }

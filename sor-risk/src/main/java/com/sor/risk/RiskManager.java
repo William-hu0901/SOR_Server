@@ -10,13 +10,17 @@ import java.util.concurrent.atomic.LongAdder;
  * 风险管理器
  * 
  * 统一管理所有风控逻辑，提供简化的 API
+ * 
+ * 使用枚举实现单例模式，确保线程安全且无需同步锁
+ * 枚举单例由JVM保证线程安全，且序列化机制保证单例唯一性
  */
-public class RiskManager {
+public enum RiskManager {
+
+    INSTANCE;
     
     private static final Logger LOG = LoggerFactory.getLogger(RiskManager.class);
     
-    // 单例模式
-    private static volatile RiskManager instance;
+    // 单例模式（使用枚举实现，线程安全且无需同步锁）
     
     // 合规引擎
     private final ComplianceEngine complianceEngine;
@@ -43,14 +47,7 @@ public class RiskManager {
      * 获取单例实例
      */
     public static RiskManager getInstance() {
-        if (instance == null) {
-            synchronized (RiskManager.class) {
-                if (instance == null) {
-                    instance = new RiskManager();
-                }
-            }
-        }
-        return instance;
+        return INSTANCE;
     }
     
     /**

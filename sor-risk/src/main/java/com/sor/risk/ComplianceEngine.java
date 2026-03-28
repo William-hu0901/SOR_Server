@@ -4,8 +4,8 @@ import com.sor.core.domain.Order;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * 合规规则引擎
@@ -16,14 +16,14 @@ public class ComplianceEngine {
     
     private static final Logger LOG = LoggerFactory.getLogger(ComplianceEngine.class);
     
-    // 风控检查器列表
+    // 风控检查器列表（线程安全，使用CopyOnWriteArrayList）
     final List<RiskChecker> checkers;
     
     /**
      * 构造函数
      */
     public ComplianceEngine() {
-        this.checkers = new ArrayList<>();
+        this.checkers = new CopyOnWriteArrayList<>();
     }
     
     /**

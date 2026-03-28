@@ -5,6 +5,8 @@ import com.sor.core.domain.Order;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.atomic.LongAdder;
+
 /**
  * 订单事件处理器
  * 
@@ -18,8 +20,8 @@ public class OrderEventHandler implements EventHandler<OrderEvent> {
     private final OrderRouter router;
     
     // 处理计数器（使用 VarHandle 实现原子操作）
-    private volatile long processedCount = 0;
-    private volatile long errorCount = 0;
+    private final LongAdder processedCount = new LongAdder();
+    private final LongAdder errorCount = new LongAdder();
     
     /**
      * 构造函数
@@ -99,18 +101,14 @@ public class OrderEventHandler implements EventHandler<OrderEvent> {
     // ==================== 统计方法 ====================
     
     private void incrementProcessed() {
-        processedCount++;
+        processedCount.increment();  // 分段累加，无锁
     }
     
-    private void incrementError() {
-        errorCount++;
-    }
+    private void incrementError() {errorCount.increment(); }
     
-    public long getProcessedCount() {
-        return processedCount;
-    }
+    public long getProcessedCount() {return processedCount.sum();    }
     
     public long getErrorCount() {
-        return errorCount;
+        return errorCount.sum();
     }
 }

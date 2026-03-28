@@ -86,15 +86,23 @@ public class SmartOrderRouter {
      * 批量路由订单（使用虚拟线程并行处理）
      */
     public void batchRoute(Order[] orders) {
-        try (var scope = new java.util.concurrent.StructuredTaskScope.ShutdownOnFailure()) {
+        try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
             // 为每个订单创建虚拟线程处理
+            var futures = new java.util.ArrayList<java.util.concurrent.Future<?>>();
             for (Order order : orders) {
-                scope.fork(() -> {
+                futures.add(executor.submit(() -> {
                     routeOrder(order);
                     return null;
-                });
+                }));
             }
-            scope.join();
+            // 等待所有任务完成
+            for (var future : futures) {
+                try {
+                    future.get();
+                } catch (java.util.concurrent.ExecutionException e) {
+                    LOG.error("Error routing order", e.getCause());
+                }
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             LOG.error("Batch routing interrupted", e);

@@ -125,7 +125,7 @@
                         <target>21</target>
                         <release>21</release>
                         <compilerArgs>
-                            <arg>--enable-preview</arg>
+<!--                            <arg>&#45;&#45;enable-preview</arg>-->
                             <arg>-parameters</arg>
                         </compilerArgs>
                     </configuration>
